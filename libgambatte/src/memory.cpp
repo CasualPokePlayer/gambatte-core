@@ -668,8 +668,18 @@ unsigned Memory::nontrivial_ff_read(unsigned const p, unsigned long const cc) {
 	case 0x3F:
 		psg_.generateSamples(cc, isDoubleSpeed());
 		return psg_.waveRamRead(p & 0xF);
+	case 0x40:
+		return 0xFF;
 	case 0x41:
-		return ioamhram_[0x141] | lcd_.getStat(ioamhram_[0x145], cc);
+	{
+		unsigned data = ioamhram_[0x141] | lcd_.getStat(ioamhram_[0x145], cc);
+		unsigned temp = 0;
+		for (unsigned i = 0; i < 8; i++) {
+			if (data & (0x80 >> i))
+				temp |= (0x01 << i);
+		}
+		return temp;
+	}
 	case 0x44:
 		return lcd_.getLyReg(cc);
 	case 0x4C:
@@ -677,6 +687,16 @@ unsigned Memory::nontrivial_ff_read(unsigned const p, unsigned long const cc) {
 			return 0xFF;
 
 		break;
+	case 0x4E:
+	{
+		unsigned data = ioamhram_[0x140];
+		unsigned temp = 0;
+		for (unsigned i = 0; i < 8; i++) {
+			if (data & (0x80 >> i))
+				temp |= (0x01 << i);
+		}
+		return temp;
+	}
 	case 0x69:
 		if (isCgb() && !isCgbDmg())
 			return lcd_.cgbBgColorRead(ioamhram_[0x168] & 0x3F, cc);
@@ -1087,6 +1107,15 @@ void Memory::nontrivial_ff_write(unsigned const p, unsigned data, unsigned long 
 		psg_.waveRamWrite(p & 0xF, data);
 		break;
 	case 0x40:
+		return;
+	case 0x4E:
+	{
+		unsigned temp = 0;
+		for (unsigned i = 0; i < 8; i++) {
+			if (data & (0x80 >> i))
+				temp |= (0x01 << i);
+		}
+		data = temp;
 		if (ioamhram_[0x140] != data) {
 			if ((ioamhram_[0x140] ^ data) & lcdc_en) {
 				unsigned const stat = data & lcdc_en ? ioamhram_[0x141] : lcd_.getStat(ioamhram_[0x145], cc);
@@ -1118,7 +1147,15 @@ void Memory::nontrivial_ff_write(unsigned const p, unsigned data, unsigned long 
 		}
 
 		return;
+	}
 	case 0x41:
+	{
+		unsigned temp = 0;
+		for (unsigned i = 0; i < 8; i++) {
+			if (data & (0x80 >> i))
+				temp |= (0x01 << i);
+		}
+		data = temp;
 		lcd_.lcdstatChange(data, cc);
 		if (!(ioamhram_[0x140] & lcdc_en) && (ioamhram_[0x141] & lcdstat_lycflag)
 				&& (~ioamhram_[0x141] & lcdstat_lycirqen & (isCgb() ? data : -1))) {
@@ -1126,6 +1163,7 @@ void Memory::nontrivial_ff_write(unsigned const p, unsigned data, unsigned long 
 		}
 		data = (ioamhram_[0x141] & 0x87) | (data & 0x78);
 		break;
+	}
 	case 0x42:
 		lcd_.scyChange(data, cc);
 		break;
